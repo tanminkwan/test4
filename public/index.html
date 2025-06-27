@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PostgreSQL MCP 설정</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      margin: 0;
+      padding: 20px;
+      background-color: #f8f9fa;
+      color: #212529;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #0066cc;
+      margin-bottom: 20px;
+    }
+    .card {
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    input, select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #0066cc;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .status {
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 10px;
+    }
+    .success {
+      background-color: #d1e7dd;
+      color: #0f5132;
+    }
+    .error {
+      background-color: #f8d7da;
+      color: #842029;
+    }
+    .info {
+      background-color: #cfe2ff;
+      color: #084298;
+    }
+    pre {
+      background-color: #f1f3f5;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>PostgreSQL MCP 서버 설정</h1>
+    
+    <!-- 상태 표시 -->
+    <div class="card">
+      <h2>MCP 서버 상태</h2>
+      <div id="status-container">
+        <p>상태 확인 중...</p>
+      </div>
+      <button id="check-status">상태 확인</button>
+    </div>
+    
+    <!-- DB 설정 폼 -->
+    <div class="card">
+      <h2>데이터베이스 연결 설정</h2>
+      <form id="db-config-form">
+        <div class="form-group">
+          <label for="host">호스트:</label>
+          <input type="text" id="host" name="host" required placeholder="localhost">
+        </div>
+        
+        <div class="form-group">
+          <label for="port">포트:</label>
+          <input type="number" id="port" name="port" placeholder="5432">
+        </div>
+        
+        <div class="form-group">
+          <label for="database">데이터베이스:</label>
+          <input type="text" id="database" name="database" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="user">사용자:</label>
+          <input type="text" id="user" name="user" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="password">비밀번호:</label>
+          <input type="password" id="password" name="password">
+        </div>
+        
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="ssl" name="ssl">
+            SSL 사용
+          </label>
+        </div>
+        
+        <button type="submit">설정 저장</button>
+      </form>
+      <div id="form-result" class="status hidden"></div>
+    </div>
+    
+    <!-- 쿼리 테스트 -->
+    <div class="card">
+      <h2>SQL 쿼리 테스트</h2>
+      <div class="form-group">
+        <label for="query">SQL 쿼리:</label>
+        <textarea id="query" rows="4" style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px; box-sizing: border-box;" placeholder="SELECT NOW()"></textarea>
+      </div>
+      <button id="execute-query">쿼리 실행</button>
+      <div class="form-group">
+        <label>결과:</label>
+        <pre id="query-result">여기에 결과가 표시됩니다.</pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // 초기 상태 확인
+      checkStatus();
+      
+      // 상태 확인 버튼 이벤트
+      document.getElementById('check-status').addEventListener('click', checkStatus);
+      
+      // DB 설정 폼 제출 이벤트
+      document.getElementById('db-config-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        setupDatabase();
+      });
+      
+      // 쿼리 실행 버튼 이벤트
+      document.getElementById('execute-query').addEventListener('click', executeQuery);
+    });
+    
+    // 서버 상태 확인 함수
+    async function checkStatus() {
+      const statusContainer = document.getElementById('status-container');
+      
+      try {
+        const response = await fetch('/mcp_postgres_status');
+        const data = await response.json();
+        
+        let statusHtml = '';
+        
+        if (data.configured) {
+          if (data.status === 'connected') {
+            statusHtml = `
+              <div class="status success">
+                <p><strong>연결됨</strong> - 서버 시간: ${data.serverTime}</p>
+                <p>데이터베이스: ${data.connection.database}@${data.connection.host}:${data.connection.port}</p>
+                <p>사용자: ${data.connection.user}</p>
+              </div>
+            `;
+          } else {
+            statusHtml = `
+              <div class="status error">
+                <p><strong>연결 오류</strong>: ${data.error}</p>
+              </div>
+            `;
+          }
+        } else {
+          statusHtml = `
+            <div class="status info">
+              <p>데이터베이스가 설정되지 않았습니다. 아래 양식을 사용하여 설정하세요.</p>
+            </div>
+          `;
+        }
+        
+        statusContainer.innerHTML = statusHtml;
+      } catch (error) {
+        statusContainer.innerHTML = `
+          <div class="status error">
+            <p>서버 연결 오류: ${error.message}</p>
+          </div>
+        `;
+      }
+    }
+    
+    // 데이터베이스 설정 함수
+    async function setupDatabase() {
+      const formResult = document.getElementById('form-result');
+      formResult.className = 'status hidden';
+      
+      // 폼 데이터 수집
+      const formData = {
+        host: document.getElementById('host').value,
+        port: document.getElementById('port').value || 5432,
+        database: document.getElementById('database').value,
+        user: document.getElementById('user').value,
+        password: document.getElementById('password').value,
+        ssl: document.getElementById('ssl').checked
+      };
+      
+      try {
+        const response = await fetch('/mcp_postgres_setup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          formResult.innerHTML = `<p>설정이 성공적으로 저장되었습니다.</p>`;
+          formResult.className = 'status success';
+          // 상태 업데이트
+          setTimeout(checkStatus, 500);
+        } else {
+          formResult.innerHTML = `<p>오류: ${data.error}</p><p>${data.details || ''}</p>`;
+          formResult.className = 'status error';
+        }
+      } catch (error) {
+        formResult.innerHTML = `<p>요청 오류: ${error.message}</p>`;
+        formResult.className = 'status error';
+      }
+    }
+    
+    // SQL 쿼리 실행 함수
+    async function executeQuery() {
+      const queryText = document.getElementById('query').value;
+      const resultElement = document.getElementById('query-result');
+      
+      if (!queryText.trim()) {
+        resultElement.textContent = '쿼리를 입력하세요.';
+        return;
+      }
+      
+      try {
+        const response = await fetch('/mcp_postgres_query', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ sql: queryText }),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          resultElement.textContent = JSON.stringify(data, null, 2);
+        } else {
+          resultElement.textContent = `오류: ${data.error}\n${data.detail || ''}`;
+        }
+      } catch (error) {
+        resultElement.textContent = `요청 오류: ${error.message}`;
+      }
+    }
+  </script>
+</body>
+</html> 

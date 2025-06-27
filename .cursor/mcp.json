@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "PostgreSQL MCP Server": {
+      "command": "node",
+      "args": ["mcp-postgres-server.js"],
+      "env": {}
+    }
+  }
+} 

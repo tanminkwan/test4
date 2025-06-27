@@ -1,0 +1,20 @@
+{
+  "name": "postgresql-mcp-server",
+  "version": "1.0.0",
+  "description": "PostgreSQL MCP Server for Cursor AI Integration",
+  "main": "mcp-postgres-server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node mcp-postgres-server.js",
+    "dev": "nodemon mcp-postgres-server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^2.0.0",
+    "pg": "^8.11.3",
+    "zod": "^3.22.2",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+} 
